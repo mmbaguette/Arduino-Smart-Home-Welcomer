@@ -77,6 +77,8 @@ bool pinging = false;
 int charsGiven = 0;
 int ipsMacsIndex;
 
+boolean newUserAlert = false;
+int newUserIndex;
 unsigned long lastEmailJoinAlert = 0;
 unsigned long emailJoinAlertInterval = 5 * 0 + 6 * 1000; // 5 minutes, 6 seconds
 
@@ -112,7 +114,7 @@ void setup()
   my_mdns.begin();
   Serial.println("Started mDNS service.");
 
-  smtp.debug(1);
+  smtp.debug(0);
   smtp.callback(smtpCallback);
   session.server.host_name = SMTP_HOST;
   session.server.port = SMTP_PORT;
@@ -177,17 +179,15 @@ void setup()
 
           strncpy(deviceName, mdnsNames[macIndex], MAX_LCD); //if anything changed, deviceName will become the real hostname
           deviceName[MAX_LCD] = '\0'; // indicate end of string
-
-          char IP_str[MAX_LCD];
-          sprintf(IP_str, IPSTR, IP2STR(joinedIP));
-          Serial.printf("%s (%s) has arrived!\n", deviceName, IP_str);
           
           if (millis() >= lastEmailJoinAlert + emailJoinAlertInterval) { //don't spam email
-            send_alert(deviceName, IP_str);
+            newUserAlert = true;
+            newUserIndex = macIndex;
             lastEmailJoinAlert = millis();
           } else {
             Serial.printf("Difference: %d. Interval: %d\n", millis() - lastEmailJoinAlert, emailJoinAlertInterval);
           }
+      
           newLCDText("Welcome,", normalTop, 5000, 0);
           newLCDText(deviceName, normalBot, 5000, 1); //why does this also show its IP??
         }
@@ -256,9 +256,7 @@ void setup()
 
   // empty Uno serial buffer
   while (Uno.available() > 0)
-  {
     Uno.read();
-  }
 }
 
 void loop()
@@ -268,8 +266,20 @@ void loop()
   my_mdns.loop(); // will allow mdns library to work continuously. must be frequently called
   showLCDText();
 
+  if (newUserAlert)
+  { // if we need alert and we haven't already
+    char deviceName[MAX_LCD];
+    char IP_str[MAX_LCD];
+    strcpy(deviceName, &mdnsNames[newUserIndex][0]);
+    sprintf(IP_str, IPSTR, IP2STR(ips[newUserIndex]));
+
+    Serial.printf("%s (%s) has arrived!\n", deviceName, IP_str);
+    send_alert(deviceName, IP_str);
+    newUserAlert = false; // no more alerts to send now
+  }
+
   if (pinging)
-    return; // everything you want to happen after pinging goes below
+    return; // everything you want to happen after pinging is done goes below
 
   if (Uno.available() > 0)
     givenIPChar = Uno.read(); // will get char sent from Arduino serial instead of user's serial monitor
@@ -335,7 +345,7 @@ void loop()
     else if (removingIP)
     {
       int givenDeviceNum = atoi(StrIP);
-      
+
       if (givenIP.fromString(StrIP))
       { // valid IP!
         uint8_t ip2Remove[4] = {givenIP[0], givenIP[1], givenIP[2], givenIP[3]};
@@ -487,7 +497,7 @@ void send_alert(const char *name, const char *IP_str)
   message.sender.email = AUTHOR_EMAIL;
   message.subject = subject;
   message.addRecipient("Home", RECIPIENT_EMAIL);
-  Serial.printf("Sending email \"%s\" to %s.\n" , subject, RECIPIENT_EMAIL);
+  Serial.printf("Sending email \"%s\" to %s.\n", subject, RECIPIENT_EMAIL);
 
   std::string htmlMsg = std::string("<h1>") + name + " joined the network!</h1><br><p>Device " + name + " (" + IP_str + ")</p>";
   message.html.content = htmlMsg;
@@ -501,17 +511,20 @@ void send_alert(const char *name, const char *IP_str)
     Serial.println("Error sending Email, " + smtp.errorReason());
 }
 
-void smtpCallback(SMTP_Status status) {
+void smtpCallback(SMTP_Status status)
+{
   Serial.println(status.info());
 
-  if (status.success()){
+  if (status.success())
+  {
     Serial.println("----------------");
     ESP_MAIL_PRINTF("Message sent success: %d\n", status.completedCount());
     ESP_MAIL_PRINTF("Message sent failled: %d\n", status.failedCount());
     Serial.println("----------------\n");
     struct tm dt;
 
-    for (size_t i = 0; i < smtp.sendingResult.size(); i++){
+    for (size_t i = 0; i < smtp.sendingResult.size(); i++)
+    {
       SMTP_Result result = smtp.sendingResult.getItem(i);
       time_t ts = (time_t)result.timestamp;
       localtime_r(&ts, &dt);
@@ -531,23 +544,27 @@ bool isalpha1(unsigned char ch)
   return unsigned((ch & (~(1 << 5))) - 'A') <= 'Z' - 'A';
 }
 
-void remove_element_dev(int index) { //remove device
-    for (int k = index; k < MAX_CLIENTS - 1 ; k++) {
-        for (int j = 0 ; j < 4 ; j++)
-            ips[k][j] = ips[k+1][j];
-    }
-    for (int k = index; k < MAX_CLIENTS - 1 ; k++) {
-        for (int j = 0 ; j < 6 ; j++)
-            macs[k][j] = macs[k+1][j];
-    }
-    for (int k = index; k < MAX_CLIENTS - 1 ; k++) {
-        for (int j = 0 ; j < MAX_LCD ; j++)
-            mdnsNames[k][j] = mdnsNames[k+1][j];
-    }
-    newLCDText("Removed device:", normalTop, 3000, 0);
-    newLCDText(StrIP, normalBot, 3000, 1);
-    Serial.printf("Removed device %s at index %d from macs, ips and mdnsNames.\n", StrIP, index);
-    saveIPsMACs();
+void remove_element_dev(int index)
+{ // remove device
+  for (int k = index; k < MAX_CLIENTS - 1; k++)
+  {
+    for (int j = 0; j < 4; j++)
+      ips[k][j] = ips[k + 1][j];
+  }
+  for (int k = index; k < MAX_CLIENTS - 1; k++)
+  {
+    for (int j = 0; j < 6; j++)
+      macs[k][j] = macs[k + 1][j];
+  }
+  for (int k = index; k < MAX_CLIENTS - 1; k++)
+  {
+    for (int j = 0; j < MAX_LCD; j++)
+      mdnsNames[k][j] = mdnsNames[k + 1][j];
+  }
+  newLCDText("Removed device:", normalTop, 3000, 0);
+  newLCDText(StrIP, normalBot, 3000, 1);
+  Serial.printf("Removed device %s at index %d from macs, ips and mdnsNames.\n", StrIP, index);
+  saveIPsMACs();
 }
 
 bool saveIPsMACs()
