@@ -7,10 +7,6 @@
 #include <mdns.h>
 #include <ESP_Mail_Client.h>
 
-#define SMTP_HOST "smtp.office365.com"
-#define SMTP_PORT 587
-
-
 /*
  * TODO:
  * Do not acknowledge DHCP lease release (device left network) as a join
@@ -34,6 +30,14 @@ extern "C"
 #define MAX_LCD 16                                                                        // max LCD chars on a line
 #define MAX_CLIENTS 10
 #define IP_ADDR_STR 16 // max length of a given IP address as string
+
+#define SMTP_HOST "smtp.office365.com" // email client variables
+#define SMTP_PORT 587
+#define AUTHOR_EMAIL ""
+#define AUTHOR_PASSWORD ""
+#define RECIPIENT_EMAIL ""
+#define SSID ""
+#define WIFI_PASS ""
 
 char normalTop[] = "Listening on..."; // default LCD text
 char normalBot[MAX_LCD];              // will be assigned when device IP is given
@@ -97,7 +101,7 @@ void setup()
   lcd.setCursor(0, 1); // set writing cursor to first column (0) and bottom row (1)
 
   WiFi.mode(WIFI_STA);              // set wifi mode to station to connect
-  WiFi.begin("kmsmk2", "57GtX/18"); // connect to SSID with PSK
+  WiFi.begin(SSID, WIFI_PASS); // connect to SSID with PSK
 
   int i; // loop number
   while (WiFi.status() != WL_CONNECTED)
@@ -184,8 +188,6 @@ void setup()
             newUserAlert = true;
             newUserIndex = macIndex;
             lastEmailJoinAlert = millis();
-          } else {
-            Serial.printf("Difference: %d. Interval: %d\n", millis() - lastEmailJoinAlert, emailJoinAlertInterval);
           }
       
           newLCDText("Welcome,", normalTop, 5000, 0);
