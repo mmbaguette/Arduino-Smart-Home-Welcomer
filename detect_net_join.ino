@@ -10,8 +10,6 @@
 /*
  * TODO:
  * Do not acknowledge DHCP lease release (device left network) as a join
- * Send email (attach link to front door cam, maybe one that goes to that point in time?)
- * Attach list of IPs and Device # to email
  */
 
 extern "C"
@@ -84,7 +82,7 @@ int ipsMacsIndex;
 boolean newUserAlert = false;
 int newUserIndex;
 unsigned long lastEmailJoinAlert = 0;
-unsigned long emailJoinAlertInterval = 5 * 0 + 6 * 1000; // 5 minutes, 6 seconds
+unsigned long emailJoinAlertInterval = 5 * 60000 + 6 * 1000; // 5 minutes, 6 seconds
 
 void smtpCallback(SMTP_Status status); // callback when email sent
 void answerCallback(const mdns::Answer *answer);
@@ -125,7 +123,7 @@ void setup()
   session.login.email = AUTHOR_EMAIL;
   session.login.password = AUTHOR_PASSWORD;
   session.login.user_domain = "";
-  Serial.printf("Logged in to email %s.\n", AUTHOR_EMAIL);
+  Serial.printf("Created session object for email %s.\n", AUTHOR_EMAIL);
 
   EEPROM.begin(sizeof(int) + MAX_CLIENTS * sizeof(uint8_t) * 10); // size of eeprom basically
   int listLength = 0;                                             // default value if no listLength was set yet in EEPROM
@@ -173,25 +171,24 @@ void setup()
         Serial.printf(MACSTR " joined the network!\n", MAC2STR(joinedMac));
 
         if (macIndex > -1) { //mac already exists
-          char deviceName[MAX_LCD+1];
           memcpy(joinedIP, &ips[macIndex], 4);
+          char deviceName[MAX_LCD+1];
 
-          if (mdnsNames[macIndex][0] == 0) {  //hostname was found
-            sprintf(deviceName, "Device %d", macIndex + 1); //default device name
-            strncpy(&mdnsNames[macIndex][0], deviceName, MAX_LCD); //store this default hostname name for now
-          }
-
+          updateDeviceName(macIndex); //if not MDNS device name found, set it to "Device X" for now
           strncpy(deviceName, mdnsNames[macIndex], MAX_LCD); //if anything changed, deviceName will become the real hostname
           deviceName[MAX_LCD] = '\0'; // indicate end of string
           
-          if (millis() >= lastEmailJoinAlert + emailJoinAlertInterval) { //don't spam email
+          if (millis() >= lastEmailJoinAlert + emailJoinAlertInterval || lastEmailJoinAlert == 0) { //don't spam email
             newUserAlert = true;
             newUserIndex = macIndex;
             lastEmailJoinAlert = millis();
           }
-      
-          newLCDText("Welcome,", normalTop, 5000, 0);
-          newLCDText(deviceName, normalBot, 5000, 1); //why does this also show its IP??
+          Serial.printf("Welcome home, %s (" IPSTR ")!\n", deviceName, IP2STR(joinedIP));
+          
+          if (!addingIP && !removingIP) { //while the user isn't being prompted to enter anything
+            newLCDText("Welcome,", normalTop, 45000, 0); //45 seconds welcome screen
+            newLCDText(deviceName, normalBot, 45000, 1);
+          }
         }
     } });
   }
@@ -232,7 +229,7 @@ void setup()
         saveIPsMACs();
         
         char deviceAddedMsg[MAX_LCD];
-        sprintf(deviceAddedMsg, "Added Device %d:", clientIndex); 
+        sprintf(deviceAddedMsg, "Added Device %d:", clientIndex + 1); 
         newLCDText(deviceAddedMsg, normalTop, 3000, 0);
         newLCDText(givenIP.toString().c_str(), normalBot, 3000, 1);
         Serial.printf("\nAdded " MACSTR " (Device %d) \n", MAC2STR(currentMac),  calcClients());
@@ -275,7 +272,6 @@ void loop()
     strcpy(deviceName, &mdnsNames[newUserIndex][0]);
     sprintf(IP_str, IPSTR, IP2STR(ips[newUserIndex]));
 
-    Serial.printf("%s (%s) has arrived!\n", deviceName, IP_str);
     send_alert(deviceName, IP_str);
     newUserAlert = false; // no more alerts to send now
   }
@@ -363,7 +359,7 @@ void loop()
       }
       else if (givenDeviceNum != 0)
       { // they gave device number instead of IP
-        Serial.printf("got device number %d\n", givenDeviceNum);
+        Serial.printf("Got device number %d\n", givenDeviceNum);
         if (givenDeviceNum > 0 && givenDeviceNum <= MAX_CLIENTS && macs[givenDeviceNum - 1][0] != NULL)
         { // the device number exists
           remove_element_dev(givenDeviceNum - 1);
@@ -490,6 +486,19 @@ void answerCallback(const mdns::Answer *answer)
   }
 }
 
+void updateDeviceName(int index) {
+  if (mdnsNames[index][0] == 0) {  //hostname was found
+    char* deviceName = (char*)malloc(sizeof(char)*MAX_LCD+1);
+
+    if (deviceName) { //memory allocation successful
+      sprintf(deviceName, "Device %d", index + 1); //default device name
+      strncpy(&mdnsNames[index][0], deviceName, MAX_LCD); //store this default hostname name for now
+
+      free(deviceName);
+    }
+  }
+}
+
 void send_alert(const char *name, const char *IP_str)
 {
   char subject[30];
@@ -499,9 +508,27 @@ void send_alert(const char *name, const char *IP_str)
   message.sender.email = AUTHOR_EMAIL;
   message.subject = subject;
   message.addRecipient("Home", RECIPIENT_EMAIL);
-  Serial.printf("Sending email \"%s\" to %s.\n", subject, RECIPIENT_EMAIL);
+  Serial.printf("Sending email \"%s\" to %s.\n", subject, RECIPIENT_EMAIL); //crash happens here
 
-  std::string htmlMsg = std::string("<h1>") + name + " joined the network!</h1><br><p>Device " + name + " (" + IP_str + ")</p>";
+  std::string tableHTML = "<head><style>table, th, td {border: 1px solid black;border-collapse: collapse; } th, td {padding: 10px;} </style></head> <table style=\"width:100%\"> <tr> <th>Device Name</th> <th>IP Address</th> <th>MAC Address</th> </tr>";
+
+  for (int i=0; i<calcClients(); i++) { //add row for info about each device
+    char tableRow[88]; //40 HTML chars, mdnsName size, size of IP and MAC string
+    Serial.println("hi");
+    updateDeviceName(i); //use "Device X" as device name if no MDNS name found
+    Serial.println("hey");
+    sprintf(tableRow, "<tr> <th>%s</th> <th>" IPSTR "</th> <th>" MACSTR "</th> </tr>", mdnsNames[i], IP2STR(ips[i]), MAC2STR(macs[i]));
+    Serial.println("sus");
+    tableHTML.append(tableRow);
+    Serial.println("amogus");
+  }
+  //concat "</table>" to the end of tableHTML
+  std::string htmlMsg = std::string("<h1>") 
+    + name
+    + " joined the network!</h1><br><p>Device " 
+    + name
+    + " (" + IP_str + ") is here!</p><br>"
+    + tableHTML;
   message.html.content = htmlMsg;
   message.text.charSet = "us-ascii";
   message.html.transfer_encoding = Content_Transfer_Encoding::enc_7bit;
