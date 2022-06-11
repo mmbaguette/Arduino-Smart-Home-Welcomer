@@ -514,13 +514,9 @@ void send_alert(const char *name, const char *IP_str)
 
   for (int i=0; i<calcClients(); i++) { //add row for info about each device
     char tableRow[88]; //40 HTML chars, mdnsName size, size of IP and MAC string
-    Serial.println("hi");
     updateDeviceName(i); //use "Device X" as device name if no MDNS name found
-    Serial.println("hey");
     sprintf(tableRow, "<tr> <th>%s</th> <th>" IPSTR "</th> <th>" MACSTR "</th> </tr>", mdnsNames[i], IP2STR(ips[i]), MAC2STR(macs[i]));
-    Serial.println("sus");
     tableHTML.append(tableRow);
-    Serial.println("amogus");
   }
   //concat "</table>" to the end of tableHTML
   std::string htmlMsg = std::string("<h1>") 
