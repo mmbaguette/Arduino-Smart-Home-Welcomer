@@ -2,7 +2,7 @@
 
 When you arrive home, this device notifies the homeowner in an email, and welcomes you with an LCD screen using your smartphone name!
 
-![greeter1](https://user-images.githubusercontent.com/76597978/173166222-d133ffe8-bd42-457f-a474-7c16354fc2a8.jpg)
+![image](https://user-images.githubusercontent.com/76597978/174444223-ce1790ad-2990-4e25-bdf9-99b5e912cdc1.png)
 
 ## Features
  - Detects when your phone automatically joins your WiFi (DHCP request)
