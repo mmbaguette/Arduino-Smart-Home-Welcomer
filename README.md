@@ -1,9 +1,11 @@
 ﻿# Arduino Smart Home Greeter
 
 ### This device greets you when you come home with an LCD screen and emails the owner that you've arrived!
-Normally, whenever someone comes back home, their smartphone should automatically connect to Wi-Fi. In this case, an ESP8266 Arduino microcontroller waits for any devices broadcasting a DHCP Discover packet, indicating that they’ve just connected to the network and arrived home. If this device is recognized on the network, it greets the person at the door using their phone’s name, obtained through the MDNS protocol.
 
 ![image](https://user-images.githubusercontent.com/76597978/174444223-ce1790ad-2990-4e25-bdf9-99b5e912cdc1.png)
+
+### Description
+Normally, whenever someone comes back home, their smartphone should automatically connect to Wi-Fi. In this case, an ESP8266 Arduino microcontroller waits for any devices broadcasting a DHCP Discover packet, indicating that they’ve just connected to the network and arrived home. If this device is recognized on the network, it greets the person at the door using their phone’s name, obtained through the MDNS protocol.
 
 ## Features
  - Detects when your phone automatically joins your WiFi
