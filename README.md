@@ -85,18 +85,6 @@ Nothing in the main loop blocks for long:
 
 ---
 
-## Limitations and what I'd change
-
-Written looking back at this in 2026:
-
-1. **No DHCP message-type check.** Any broadcast to port 67 from a known MAC counts as an arrival. The fix is to parse DHCP option 53 (message type) and act only on `DISCOVER` and `REQUEST`.
-2. **Fixed-offset parsing only.** DHCP option 12 carries the client's hostname. Parsing the options would name devices without depending on mDNS, which only Apple devices reliably use.
-3. **Private MAC addresses.** Modern phones use a randomized, per-network MAC by default. It's usually stable for a given network, but a phone that rotates or resets its private address will stop being recognized.
-4. **Registration requires typing an IP.** A better flow would be "press A, then reconnect your phone," capturing the MAC from the next DHCP broadcast instead of pinging.
-5. **Arduino libraries throughout.** Everything goes through library abstractions (`AsyncUDP`, `SoftwareSerial`, `LiquidCrystal`). That was the right call for a working prototype, but none of it touches hardware registers directly.
-
----
-
 ## Hardware
 
 - 1 × Arduino Uno (keypad scanner)
